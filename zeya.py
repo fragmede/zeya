@@ -226,7 +226,7 @@ def main(port):
     print "Loading library..."
     library_contents = backend.get_library_contents()
     library_repr = json.dumps(library_contents, ensure_ascii=False)
-    basedir = os.path.abspath(os.path.dirname(sys.argv[0]))
+    basedir = os.path.abspath(os.path.realdir(os.path.dirname(sys.argv[0])))
     server = BaseHTTPServer.HTTPServer(
         ('', port),
         ZeyaHandler(os.path.join(basedir, 'resources')))
