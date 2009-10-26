@@ -127,6 +127,8 @@ class DirectoryBackend(LibraryBackend):
                         # non-audio but we want to not abort from this.
                         continue
                     # Set the artist, title, and album now, and the key below.
+                    if tag is None:
+                        continue
                     metadata = { ARTIST: tag.artist,
                                  TITLE: tag.title,
                                  ALBUM: tag.album,
