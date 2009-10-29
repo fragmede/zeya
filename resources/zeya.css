@@ -16,9 +16,42 @@ body {
     left: 0;
     width: 100%;
     height: 40px;
-    overflow: auto;
+    overflow: hidden;
     background-color: #f6f5f4;
     border-bottom: 1px solid #999;
+}
+
+#header-left {
+    float: left;
+    height: 40px;
+}
+
+#header-right {
+    height: 100%;
+    float: right;
+    width: 12em;
+}
+
+#header-right form {
+    height: 100%;
+    position: relative;
+}
+
+#header-right form input {
+    position: absolute;
+    top: 50%;
+    width: 12em;
+    height: 1.2em;
+    margin-top: -0.90em;
+    right: 0.8em;
+}
+
+#header-main {
+    margin-top: 20px;
+}
+
+#header-main-inner {
+    margin-top: -0.70em;
 }
 
 #footer {
@@ -32,24 +65,95 @@ body {
     border-top: 1px solid #999;
 }
 
-#footer-content {
+#footer-left {
     padding: 1px;
+    width: 50%;
+    float: left;
+    font-size: 72%;
+}
+
+#footer-right {
+    padding: 1px;
+    width: 30%;
+    float: right;
     text-align: right;
     font-size: 72%;
 }
 
 #content {
     position: fixed;
-    top: 40px;
+    top: 41px;
     left: 0;
-    bottom: 16px;
+    bottom: 17px;
     right: 0;
-    overflow: auto;
+    overflow-y: scroll;
     padding: 1px;
 }
 
 #loading {
+    margin: 3em auto 0 auto;
+    padding: 0.25em;
+    width: 15em;
+    background-color: #f3f2aa;
     text-align: center;
+    font-weight: bold;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+}
+
+#unsupported {
+    display: none;
+    margin: 3em auto 0 auto;
+    padding: 0.25em;
+    width: 26em;
+    background-color: #ffc6bb;
+    color: #500;
+    text-align: center;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+}
+
+#unsupported a {
+    color: #400;
+}
+
+#helpcontainer {
+    position: fixed;
+    top: 50px;
+    width: 100%;
+    display: none;
+}
+
+#help {
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    padding: 5px;
+    background-color: #333;
+    color: #fff;
+    width: 25em;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#help a {
+    color: #fff;
+}
+
+#help p:first-child {
+    margin-top: 0;
+    text-align: center;
+    font-size: 120%;
+}
+
+#help table {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#help tr td:first-child {
+    padding-right: 2em;
+    text-align: center;
+    font-family: monospace;
 }
 
 span.control img {
@@ -77,7 +181,6 @@ span.control img.grayed {
 span.title {
     font-size: large;
     font-weight: bold;
-    margin-left: 1em;
 }
 
 span.artist {
@@ -95,15 +198,33 @@ a:visited {
 
 table#collection_table {
     width: 100%;
+    table-layout: fixed;
+    border-spacing: 0;
+}
+
+table#collection_table tr.oddrow {
+    background-color: #e6e4e2;
+}
+
+table#collection_table tr.selectedrow {
+    background-color: #46d;
+    color: #fff;
+}
+
+table#collection_table tr.selectedrow a {
+    color: #fff;
 }
 
 table#collection_table td {
-    padding: 0px;
+    margin: 0;
+    padding: 1px 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 table#collection_table thead td {
     background-color: #eeecea;
     border: 1px outset #eeecea;
     font-weight: bold;
-    padding: 1px;
 }

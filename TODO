@@ -1,8 +1,22 @@
-- Add favicon
+USER INTERFACE
 
-- When end of playlist is hit, the 'play' button remains pressed and currently
-	playing doesn't change even though nothing is playing
+- Add functions for repeat collection, repeat album, repeat song
 
-- Add function for repeat/repeat album/repeat 1
+- Add a timer and seek bar
 
-- --path should imply --backend=dir
+- Detect when the server is no longer available and display an appropriate
+  message.
+
+- zeyaclient.py should support --help
+
+ADDITIONAL FEATURES
+
+- Allow using a page fragment (/#xyz...) to specify a song.
+
+- Remote control of clients
+
+- Investigate feasibility of gapless playback
+
+OTHER
+
+- Add more tests to test suite.

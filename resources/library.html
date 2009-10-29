@@ -2,46 +2,85 @@
 <html>
 <head>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+  <meta http-equiv="X-UA-Compatible" content="chrome=1">
   <link rel="stylesheet" type="text/css" href="zeya.css">
+  <link rel="icon" type="image/png" href="favicon.png">
   <script type="text/javascript" src="zeya.js"><!--
   // --></script>
   <title>Zeya</title>
 </head>
-<body onload="init()" onkeypress="return keypress_handler(event);">
+<body onload="init()"
+      onunload="cleanup()"
+      onkeydown="return keydown_handler(event);"
+      onkeypress="return keypress_handler(event);">
   <div id="header">
-    <span id="previous_button" class="control">
-      <img id="previous_img" src="previous.png" alt="Previous" onclick="previous()" title="Previous">
-    </span>
-    <span id="play_button" class="control">
-      <img id="play_img" src="play.png" alt="Play" onclick="play()" title="Play">
-    </span>
-    <span id="pause_button" class="control">
-      <img id="pause_img" src="pause.png" alt="Pause" onclick="pause()" title="Pause">
-    </span>
-    <span id="next_button" class="control">
-      <img id="next_img" src="next.png" alt="Next" onclick="next()" title="Next">
-    </span>
-    <span class="title" id="title_text"></span>
-    <span class="artist" id="artist_text"></span>
+    <div id="header-left">
+      <span id="previous_button" class="control">
+	<img id="previous_img" src="previous.png" alt="Previous"
+	     onclick="previous()" title="Previous">
+      </span>
+      <span id="play_button" class="control">
+	<img id="play_img" src="play.png" alt="Play"
+	     onclick="play()" title="Play">
+      </span>
+      <span id="pause_button" class="control">
+	<img id="pause_img" src="pause.png" alt="Pause"
+	     onclick="pause()" title="Pause">
+      </span>
+      <span id="next_button" class="control">
+	<img id="next_img" src="next.png" alt="Next"
+	     onclick="next()" title="Next">
+      </span>
+      <span id="spinner" class="control">
+	<img id="spinner_icon" src="spinner.gif"
+	     style="margin: 7px 0 7px 7px; visibility: hidden">
+      </span>
+    </div>
+    <div id="header-right">
+      <form name="search_form" onsubmit="return search(this)">
+	<input type="text" name="search_box" size="16" id="search_box"
+	       placeholder="Search"/>
+      </form>
+    </div>
+    <div id="header-main">
+      <div id="header-main-inner">
+	<span class="title" id="title_text"></span>
+	<span class="artist" id="artist_text"></span>
+      </div>
+    </div>
   </div>
   <div id="footer">
-    <div id="footer-content">
-      Powered by <a href="http://web.psung.name/zeya/" target="_blank">Zeya</a>
+    <div id="footer-left">
+      <span id="status_area"/>
+    </div>
+    <div id="footer-right">
+      Powered by <a href="http://web.psung.name/zeya/" target="_blank">Zeya</a> |
+      <a href="javascript:show_help();">Help</a>
     </div>
   </div>
   <div id="content">
     <div id="loading">Loading collection...</div>
-    <div id="collection">
-      <table id="collection_table">
-	<thead>
-	  <tr>
-	    <td style="width: 42%">Title</td>
-	    <td style="width: 29%">Artist</td>
-	    <td style="width: 29%">Album</td>
-	  </tr>
-	</thead>
-      </table>
+    <div id="unsupported">Zeya requires a browser that supports the HTML 5
+      draft standard. We
+      recommend <a href="http://www.mozilla.com/firefox/">Mozilla Firefox</a>
+      3.5+ or <a href="http://www.google.com/chrome">Google Chrome</a>
+      4.0+.</div>
+    <div id="helpcontainer">
+      <div id="help">
+	<p><b>Keyboard shortcuts</b></p>
+	<table>
+	  <tr><td>SPACE</td><td>Play/pause</td></tr>
+	  <tr><td>j</td><td>Next track</td></tr>
+	  <tr><td>k</td><td>Previous track</td></tr>
+	  <tr><td>/</td><td>Search</td></tr>
+	  <tr><td>?</td><td>Show this help message</td></tr>
+	</table>
+	<p style="margin-bottom: 0; text-align: right">
+	  <a href="javascript:hide_help()">Close</a>
+	</p>
+      </div>
     </div>
+    <div id="collection" style="display: none"></div>
   </div>
 </p>
 </body>

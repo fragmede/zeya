@@ -28,6 +28,7 @@ import tagpy
 import pickle
 
 from backend import LibraryBackend
+from common import tokenize_filename
 
 KEY = 'key'
 TITLE = 'title'
@@ -43,7 +44,7 @@ class DirectoryBackend(LibraryBackend):
     Object that controls access to music in a given directory.
     """
     def __init__(self, media_path, save_db=True):
-        self._media_path = media_path
+        self._media_path = os.path.expanduser(media_path)
         self._save_db = save_db
         # Sequence of dicts containing song metadata (key, artist, title, album)
         self.db = []
@@ -55,7 +56,7 @@ class DirectoryBackend(LibraryBackend):
         self.setup_db()
 
     def get_db_filename(self):
-        return os.path.expanduser(os.path.join(self._media_path, 'zeya.db'))
+        return os.path.join(self._media_path, 'zeya.db')
 
     def setup_db(self):
         # Load the previous database from file, and convert it to a
@@ -103,8 +104,8 @@ class DirectoryBackend(LibraryBackend):
         print "Scanning library..."
         # Iterate over all the files.
         for path, dirs, files in os.walk(self._media_path):
-            for filename in [os.path.abspath(os.path.join(path, filename)) for
-                         filename in files]:
+            for filename in sorted(files, key=tokenize_filename):
+                filename = os.path.abspath(os.path.join(path, filename))
                 # For each file that we encounter, see if we have cached data
                 # for it, and if we do, use it instead of calling out to tagpy.
                 # previous_db acts as a cache of mtime and metadata, keyed by
@@ -127,16 +128,12 @@ class DirectoryBackend(LibraryBackend):
                         # non-audio but we want to not abort from this.
                         continue
                     # Set the artist, title, and album now, and the key below.
-                    if tag is None:
-                        continue
-                    metadata = { ARTIST: tag.artist,
-                                 TITLE: tag.title,
-                                 ALBUM: tag.album,
+                    metadata = { ARTIST: tag.artist if tag is not None else '',
+                                 TITLE: \
+                                    tag.title if tag is not None and tag.title else \
+                                    os.path.basename(filename),
+                                 ALBUM: tag.album if tag is not None else '',
                                }
-
-                # Ensure that the title is not empty, because the user has to
-                # click on it.
-                metadata[TITLE] = metadata[TITLE] or os.path.basename(filename)
 
                 # Number the keys consecutively starting from 0.
                 next_key = len(self.key_filename)

@@ -28,30 +28,61 @@ INSTRUCTIONS
    following: Ogg/Vorbis, FLAC, and MP3. On an Ubuntu system you can do this
    with:
 
-    aptitude install vorbis-tools flac mpg321
+     aptitude install vorbis-tools    # Vorbis encoder and decoder
+     aptitude install flac mpg123     # Flac and MP3 decoders
 
-   Python <=2.5 users will need to install the simplejson library:
+   Make sure you have Python 2.5 or 2.6 installed:
 
-    aptitude install python-simplejson
+     aptitude install python2.6
 
-   If you're using the directory backend, also install tagpy:
+   Python 2.5 users will need to install the simplejson library:
 
-    aptitude install python-tagpy
+     aptitude install python-simplejson
 
-3. Run zeya.py. The --help flag shows the available options.
+   If you're using the 'dir' (directory) backend, also install tagpy:
+
+     aptitude install python-tagpy
+
+3. Run zeya.py. The --help flag shows the available options. We support two
+   backends:
+
+   'rhythmbox' (default): read files from the current user's Rhythmbox library
+
+     $ zeya.py
+
+   'dir': read files from a directory and its subdirectories (recursively)
+
+     $ zeya.py --path=/path/to/music
 
 
 CLIENT SUPPORT
 
-Zeya has been tested in the following browsers:
+Zeya works well in Firefox 3.5+ and well enough on Chrome 3+. See the section
+below, titled "NOTES ON SUPPORTED CLIENTS", for more details.
 
-* Firefox 3.5.2
+We also provide zeyaclient.py, a rudimentary Python client (1) for use when a
+more lightweight client is needed or when no HTML5-compliant browser is
+available and (2) as a simple example of programmatic (and non browser-based)
+access to a Zeya servers.
 
-  All Firefox versions >= 3.5 should work. No issues are known.
 
-* Chrome 3.0.198.1
+NOTES ON SUPPORTED CLIENTS
 
-  Zeya works, with a couple of caveats, described below.
+* Firefox
+
+  All Firefox versions >= 3.5 should work.
+
+  Zeya is known to work in Firefox 3.5.3 on GNU/Linux and Windows.
+
+* Chrome
+
+  At the time of writing, official 64-bit builds ("Google Chrome") on GNU/Linux
+  do not play audio (chromium bug #23152). The Chromium builds work just fine.
+  32-bit GNU/Linux and other platforms are unaffected.
+
+  Zeya is known to work in Chrome 4.0.220.1, and likely also for dev channel
+  builds since at least 3.0.198.1, on GNU/Linux and Windows, with the caveat
+  above.
 
   Known issues:
 
@@ -60,9 +91,17 @@ Zeya has been tested in the following browsers:
 
     Chrome seems to require the Content-Length header to be set on audio data,
     so we have to finish encoding the entire file before we can send any data
-    to the client. In addition, Chrome seems to request each audio file twice.
+    to the client.
 
-  Zeya does not advance to the next song when the current one has finished.
+  The Previous button (and the "k" key) doesn't work in Chrome.
 
-    This is due to chromium bug 16768 and is fixed in Chrome/chromium >=
-    r23336. <http://code.google.com/p/chromium/issues/detail?id=16768>
+    This is apparently related to Chrome not implementing audio.currentTime.
+
+* Internet Explorer (with Chrome Frame plugin)
+
+  Known Issues: see Chrome KIs above.
+
+
+DEVELOPMENT AND TESTING
+
+You can invoke our test suite by running zeyatest.py.
