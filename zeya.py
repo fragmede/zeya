@@ -27,16 +27,17 @@ from __future__ import with_statement
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from SocketServer import ThreadingMixIn
 
+import base64
+import crypt
 import getopt
-import urllib
 import os
 import socket
 import sys
 import tempfile
 import traceback
+import urllib
 import zlib
-import base64
-import crypt
+
 try:
     from urlparse import parse_qs
 except: # (ImportError, AttributeError):
@@ -59,17 +60,15 @@ valid_backends = ['rhythmbox', 'dir']
 auth = 'Authorization'
 bas = 'Basic '
 no_auth_rval = \
-"""<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01
-        Transitional//EN"
-         "http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
-         <HTML>
-           <HEAD>
-               <TITLE>Error</TITLE>
-                   <META HTTP-EQUIV="Content-Type" CONTENT="text/html;
-                   charset=ISO-8859-1">
-                     </HEAD>
-                       <BODY><H1>401 Unauthorized.</H1></BODY>
-</HTML>
+"""
+<!DOCTYPE html>
+    <HTML>
+        <HEAD>
+            <TITLE>Error</TITLE>
+            <meta http-equiv="Content-Type" content="text/html;charset=utf-8"/>
+        </HEAD>
+        <BODY><H1>401 Unauthorized.</H1></BODY>
+    </HTML>
 """
 
 class BadArgsError(Exception):
@@ -90,6 +89,8 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
         address_family = socket.AF_INET6
 
 def split_user_pass(data):
+    """
+    """
     idx = data.find(':')
     return data[:idx], data[idx+1:]
 
@@ -104,6 +105,10 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
     Library data.
     Base directory for resources.
     Bitrate for encoding.
+
+    For the ZeyaBasicAuthHandlerImpl
+    auth_type for 'Basic'
+    auth_data dict holding user/pass-crypt
     """
 
     class ZeyaHandlerImpl(BaseHTTPRequestHandler):
@@ -235,6 +240,9 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
 
     class ZeyaBasicAuthHandlerImpl(ZeyaHandlerImpl):
         def send_no_auth(self):
+            """
+            Send an unauthorized required page.
+            """
             self.send_response(401)
             self.send_header('Content-type', 'text/html')
             self.send_header('Content-Length', str(len(no_auth_rval)))
@@ -243,6 +251,9 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
             self.wfile.write(no_auth_rval)
 
         def authorized(self):
+            """
+            Return true if self.headers has valid authentication information.
+            """
             if auth in self.headers and self.headers[auth]:
                 if self.headers[auth][:len(bas)] == bas:
                     auth_header = self.headers[auth][len(bas):]
@@ -255,6 +266,10 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
             return False
 
         def do_GET(self):
+            """
+            Handle a GET request, sending an authentication required header if
+            not authenticated.
+            """
             if self.authorized():
                 ZeyaHandlerImpl.do_GET(self)
             else:
@@ -275,6 +290,7 @@ def get_options():
     bitrate: bitrate for encoded streams (kbits/sec)
     port: port number to listen on
     path: path from which to read music files (for "dir" backend only)
+    basic_auth_file: file handle to read basic auth from
     """
     help_msg = False
     port = DEFAULT_PORT
@@ -382,15 +398,15 @@ def run_server(backend, port, bitrate, basic_auth_file=None):
     auth_data = None
     if basic_auth_file is not None:
         auth_data = {}
-        for line in basic_auth_file.xreadlines():
-            s_user, s_pass = split_user_pass(line[:-1])
+        for line in basic_auth_file:
+            s_user, s_pass = split_user_pass(line.rstrip())
             auth_data[s_user] = s_pass
     server = ThreadedHTTPServer(
         ('', port),
         ZeyaHandler(backend,
                     library_repr,
                     os.path.join(basedir,
-                                 'resources',),
+                                 'resources'),
                     bitrate,
                     auth_type=None if basic_auth_file is None else 'basic',
                     auth_data=auth_data,
