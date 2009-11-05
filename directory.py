@@ -144,7 +144,7 @@ class DirectoryBackend(LibraryBackend):
                                  TITLE: \
                                     tag.title if tag is not None and tag.title else \
                                     os.path.basename(filename),
-                                 ALBUM: album_name()
+                                 ALBUM: album_name(tag, filename)
                                }
 
                 # Number the keys consecutively starting from 0.
