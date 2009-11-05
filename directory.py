@@ -39,6 +39,18 @@ DB = 'db'
 KEY_FILENAME = 'key_filename'
 MTIMES = 'mtimes'
 
+def album_name(tag, filename):
+    """ Use path components for album name if album name is empty """
+    if tag is None or not (tag.album or tag.artist):
+        path_components = [x for x in
+            os.path.dirname(filename).split(os.sep) if x]
+        if len(path_components) >= 2:
+            return os.sep.join(path_components[-2:])
+        elif len(path_components) == 1:
+            return path_components[0]
+        return ''
+    return tag.album
+
 class DirectoryBackend(LibraryBackend):
     """
     Object that controls access to music in a given directory.
@@ -132,7 +144,7 @@ class DirectoryBackend(LibraryBackend):
                                  TITLE: \
                                     tag.title if tag is not None and tag.title else \
                                     os.path.basename(filename),
-                                 ALBUM: tag.album if tag is not None else '',
+                                 ALBUM: album_name()
                                }
 
                 # Number the keys consecutively starting from 0.
