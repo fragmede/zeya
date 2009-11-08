@@ -3,6 +3,7 @@ import os
 import signal
 import socket
 import StringIO
+import struct
 import subprocess
 import thread
 import time
@@ -16,65 +17,101 @@ except AttributeError:
         os.kill(self.pid, signal.SIGTERM)
     subprocess.Popen.terminate = sub_popen_terminate
 
-
 output_list = []
+header_packets = []
+
 bitrate = 64
 
-class SockAdaptor(object):
-    def __init__(self, sock):
-        self.sock = sock
+HEADER_LEN = 1
+OGG_MAGIC = 'OggS\x00'
+#GRANULE_POS_OFFSET = 6
+GRANULE_POS_LEN = 8
+SERIAL_NUM_LEN = 4
+PAGE_SEQ_LEN = 4
+CHECKSUM_LEN = 4
+PAGE_SEGMENTS_LEN = 1
 
-    def write(self, data):
-        return self.sock.send(data)
+class OggPacketizer(object):
+    def __init__(self, input_stream):
+        self.header = ''
+        self.read_ogg_packet(input_stream)
 
-    def read(self, data_len):
-        return self.sock.recv(data_len)
+    def is_header(self):
+        return all([x == '\x00' for x in self.granule_pos])
 
-class Encoder(object):
+    def read_ogg_packet(self, data):
+        magic = data.read(len(OGG_MAGIC))
+        assert(magic == OGG_MAGIC)
+
+        # TODO - make map creating locals
+        self.header_type = data.read(HEADER_LEN)
+        self.granule_pos = data.read(GRANULE_POS_LEN)
+        self.serial_num = data.read(SERIAL_NUM_LEN)
+        self.page_seq_num = data.read(PAGE_SEQ_LEN)
+        self.checksum = data.read(CHECKSUM_LEN)
+        self.page_segments = ord(data.read(PAGE_SEGMENTS_LEN))
+
+        #print 'header_type  ',  repr(self.header_type)
+        #print 'granule_pos  ',  repr(self.granule_pos)
+        #print 'serial_num   ',  repr(self.serial_num)
+        #print 'page_seq_num ',  repr(self.page_seq_num)
+        #print 'checksum     ',  repr(self.checksum)
+        #print 'page_segments',  repr(self.page_segments)
+
+        #print '  page_segs', self.page_segments
+
+        #if self.page_segments == 0:
+        #    foo = data.read(1)
+        #    #print 's', ord(foo)
+        #    data.read(ord(foo)+16)
+        #    #print 'endp', hex(f.tell())
+        #    return
+
+        segment_table = data.read(self.page_segments)
+        #segment_table = data.read(0)
+        segments = []
+        #print 'st', segment_table
+        for segment in segment_table:
+            #print 'segment n', hex(ord(segment))
+            segments.append(data.read(ord(segment)))
+
+        #data.read(1)
+
+class OggPageSync(object):
     def __init__(self, output):
-        #encode_command = ["/usr/bin/oggenc", "-r", "-b", str(bitrate), "-"]
-        encode_command = "/usr/bin/oggenc -r -Q -b 64 -"
-        self.p2 = p2 = subprocess.Popen(encode_command,
-                                        stdin=subprocess.PIPE,
-                                        stdout=subprocess.PIPE,
-                                        shell=True)
-        #self.write = p2.stdin.write
         self.output_sock = output
-        #p2.stdout.setblocking(0)
-        fcntl.fcntl(p2.stdout.fileno() , fcntl.F_SETFL, os.O_NONBLOCK)
+        self.syncd = False
 
     def write(self, data):
-        self.p2.stdin.write(data)
-        return
-        comms = self.p2.communicate(data)
-        print 'comm', len(comms[0])
-        self.output_sock.send(comms[0])
-
-    def output(self):
-        #data = self.p2.communicate()[0]
-        try:
-            data = self.p2.stdout.read(4096)
-        except IOError:
+        if self.syncd:
+            self.output_sock.send(data)
             return
-        self.output_sock.send(data)
-        #self.p2.poll()
+        page_start = data.find(OGG_MAGIC)
+        if page_start == -1:
+            return
+        self.output_sock.send(data[page_start:])
+        self.syncd = True
 
 def reader():
     global output_list
     print 'reader thread started'
-    input_name = 'ogg_fifo'
-    f = open(input_name, 'r')
+    input_fifo = 'ogg_fifo'
+    global header_packets
+    f = open(input_fifo, 'r')
     while True:
         time.sleep(.2)
         while len(output_list) == 0:
             time.sleep(.2)
-        buff = f.read(81920)
+        packet = ogg_packet(f)
+        if packet.is_header():
+            header_packets.append(packet)
+        #buff = f.read(4096)
         for output in output_list:
             output.write(buff)
-            output.output()
 
 def server(num):
     global output_list
+    global header_packets
     print 'server thread', num, 'started'
 
     pipename = 'output%s' % (num, )
@@ -90,16 +127,49 @@ def server(num):
 
     conn, addr = s.accept()
     print 'client connected', conn, addr
-    #output_list.append(Encoder(SockAdaptor(conn)))
-    output_list.append(Encoder(conn))
-    #while True:
-    #    time.sleep(.2)
+    for packet in header_packets:
+        conn.send(packet)
+
+    output_list.append(OggPageSync(conn))
 
 if __name__ == "__main__":
-    #thread.start_new_thread(reader, ())
-    thread.start_new_thread(server, (0,))
-    thread.start_new_thread(server, (1,))
+    #test ogg packets at:
+    #  0x0
+    #  0x3a
+    #  0xf8b
+    #  0x1fc9
+    #  0x30d1
+    #  0x4111
 
-    reader()
-    while True:
-        time.sleep(.2)
+#    f = open('test.ogg', 'r')
+#    d = f.read(0x5000)
+#    offset = -1
+#    pack_begins = []
+#    while True:
+#        idx = d.find('OggS')
+#        if idx == -1:
+#            break
+#        d = d[idx+1:]
+#        offset += idx + 1
+#        print hex(offset)
+#        pack_begins.append(offset)
+#
+#    print 'packs'
+#    for offset in pack_begins:
+#        f.seek(offset, 0)
+#        print hex(offset), f.read(6).find('O')
+        #print offset, repr(f.read(6))
+    #import sys
+    #sys.exit()
+    f = open('test.ogg', 'r')
+    for i in range(8):
+        p = OggPacketizer(f)
+        print 'packet', i, 'at', hex(f.tell()), p.is_header()
+
+    #thread.start_new_thread(reader, ())
+    #thread.start_new_thread(server, (0,))
+    #thread.start_new_thread(server, (1,))
+
+    #reader()
+    #while True:
+    #    time.sleep(.2)
