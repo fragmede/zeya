@@ -39,13 +39,11 @@ DB = 'db'
 KEY_FILENAME = 'key_filename'
 MTIMES = 'mtimes'
 
-def album_name_from_path(tag, filename):
+def album_name_from_path(filename):
     """
-    Returns an appropriate string to use for the album name if the tag is
+    Returns a filename derived string to use as album name if the tag is
     empty.
     """
-    if tag is not None and (tag.artist or tag.album):
-        return ''
     # Use the trailing components of the path.
     path_components = [x for x in os.path.dirname(filename).split(os.sep) if x]
     if len(path_components) >= 2:
@@ -193,12 +191,13 @@ def extract_metadata(filename, tagpy_module = tagpy):
     metadata = {
         TITLE: os.path.basename(filename).decode("UTF-8"),
         ARTIST: '',
-        ALBUM: album_name_from_path(tag, filename),
+        ALBUM: album_name_from_path(filename),
         }
     if tag is not None:
         metadata[ARTIST] = tag.artist
         # Again, do not allow metadata[TITLE] to be an empty string, even if
         # tag.title is an empty string.
         metadata[TITLE] = tag.title or metadata[TITLE]
-        metadata[ALBUM] = tag.album or metadata[ALBUM]
+        metadata[ALBUM] = tag.album if tag.album else metadata[ALBUM] \
+                if not (tag.artist or tag.album) else ''
     return metadata
