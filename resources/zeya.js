@@ -52,31 +52,83 @@ function get_index_from_row_id(id) {
 // Return the class to use for the row corresponding to the given index. This
 // determines the color of the row.
 function get_row_class_from_index(index) {
-  return index % 2 == 0 ? 'evenrow' : 'oddrow';
+  return index % 2 === 0 ? 'evenrow' : 'oddrow';
 }
 
+// Hide or show the spinner.
+function set_spinner_visible(visible) {
+  document.getElementById("spinner_icon").style.visibility =
+    visible ? "visible" : "hidden";
+}
+
+// Check if the song with the given index is the last in the list.
+function is_last_track(index) {
+  var collection = document.getElementById('collection_table');
+  var index_row = document.getElementById(get_row_id_from_index(index));
+  return index_row == collection.lastChild;
+}
+
+function plural(number) {
+  return number > 1 ? 's' : '';
+}
+
+// Returns an Audio object corresponding to the track with the given key.
+function get_stream(key) {
+  var buffer_param = using_webkit ? 'buffered=true&' : '';
+  return new Audio('/getcontent?' + buffer_param + 'key=' + escape(key));
+}
+
+function update_status_area() {
+  var status_area = document.getElementById('status_area');
+  var status_text = status_info.displayed_tracks + ' track'
+       + plural(status_info.displayed_tracks);
+
+  if (status_info.displayed_tracks < status_info.total_tracks) {
+    status_text += ' (' + status_info.total_tracks + ' total)';
+  }
+
+  clear_children(status_area);
+  status_area.appendChild(document.createTextNode(status_text));
+}
+
+// Return true if the item matches the given query string.
 function item_match(item, match_string) {
   var s = match_string.toLowerCase();
-  if (item.title.toLowerCase().indexOf(s) == -1
-      && item.artist.toLowerCase().indexOf(s) == -1
-      && item.album.toLowerCase().indexOf(s) == -1) {
-      return false;
+  if (s.match('^artist:')) {
+    return item.artist.toLowerCase().indexOf(s.substring(7)) != -1;
+  } else if (s.match('^title:')) {
+    return item.title.toLowerCase().indexOf(s.substring(6)) != -1;
+  } else if (s.match('^album:')) {
+    return item.album.toLowerCase().indexOf(s.substring(6)) != -1;
+  } else {
+    return !(item.title.toLowerCase().indexOf(s) == -1
+             && item.artist.toLowerCase().indexOf(s) == -1
+             && item.album.toLowerCase().indexOf(s) == -1);
   }
-  return true;
 }
 
-// Request the collection from the server then render it.
-function load_collection() {
-  var req = new XMLHttpRequest();
-  req.open('GET', '/getlibrary', true);
-  req.onreadystatechange = function(e) {
-    if (req.readyState == 4 && req.status == 200) {
-      library = JSON.parse(req.responseText);
-      status_info.total_tracks = library.length;
-      render_collection();
-    }
-  };
-  req.send(null);
+// Set the state of the UI.
+function set_ui_state(new_state) {
+  if (new_state == 'grayed') {
+    // All buttons grayed.
+    document.getElementById("previous_img").className = 'grayed';
+    document.getElementById("play_img").className = 'grayed';
+    document.getElementById("pause_img").className = 'grayed';
+    document.getElementById("next_img").className = 'grayed';
+  } else if (new_state == 'play') {
+    // 'Play' depressed
+    document.getElementById("previous_img").className = '';
+    document.getElementById("play_img").className = 'activated';
+    document.getElementById("pause_img").className = '';
+    document.getElementById("next_img").className = '';
+  } else {
+    // 'Pause' depressed
+    document.getElementById("previous_img").className = '';
+    document.getElementById("pause_img").className = 'activated';
+    document.getElementById("play_img").className = '';
+    document.getElementById("previous_img").className = '';
+  }
+  current_state = new_state;
 }
 
 // Render a table to display it the collection.
@@ -141,6 +193,20 @@ function render_collection() {
   update_status_area();
 }
 
+// Request the collection from the server then render it.
+function load_collection() {
+  var req = new XMLHttpRequest();
+  req.open('GET', '/getlibrary', true);
+  req.onreadystatechange = function(e) {
+    if (req.readyState == 4 && req.status == 200) {
+      library = JSON.parse(req.responseText);
+      status_info.total_tracks = library.length;
+      render_collection();
+    }
+  };
+  req.send(null);
+}
+
 // Clear displayed collection.
 function clear_collection() {
   clear_children(document.getElementById('collection'));
@@ -153,6 +219,7 @@ function search() {
   var search_box = document.getElementById('search_box');
   search_string = search_box.value;
   search_box.blur();
+  window.document.getElementById('content').focus();
   // Redisplay collection, filtering on the search string.
   clear_collection();
   // The setTimeout trick is to force the browser to display the loading
@@ -187,12 +254,6 @@ function play() {
   }
 }
 
-// Hide or show the spinner.
-function set_spinner_visible(visible) {
-  document.getElementById("spinner_icon").style.visibility =
-    visible ? "visible" : "hidden";
-}
-
 // Sets the title/artist fields that are displayed in the header, and the page
 // title.
 function set_title(title, artist) {
@@ -211,23 +272,6 @@ function set_title(title, artist) {
   }
 }
 
-function plural(number) {
-  return number > 1 ? 's' : '';
-}
-
-function update_status_area() {
-  var status_area = document.getElementById('status_area');
-  var status_text = status_info.displayed_tracks + ' track'
-       + plural(status_info.displayed_tracks);
-
-  if (status_info.displayed_tracks < status_info.total_tracks) {
-    status_text += ' (' + status_info.total_tracks + ' total)';
-  }
-
-  clear_children(status_area);
-  status_area.appendChild(document.createTextNode(status_text));
-}
-
 // Return the line number corresponding to this row.
 // Note that this is not the same as the index if a search filter has
 // been applied.
@@ -242,6 +286,53 @@ function get_line_number(element) {
   return ret;
 }
 
+// Return the index of the next song, with wraparound.
+function next_index() {
+  var current_row = document.getElementById(get_row_id_from_index(current_index));
+
+  if (!current_row) {
+    // Display changed since we began playing and the displayed
+    // collection is empty.
+    return null;
+  }
+
+  var collection = document.getElementById('collection_table');
+
+  // If on the last row, go back to the first.
+  if (current_row == collection.lastChild) {
+    // The table's firstChild is the heading.
+    return get_index_from_row_id(collection.firstChild.nextSibling.id);
+  }
+  var next_row = current_row.nextSibling;
+  if (next_row) {
+    return get_index_from_row_id(next_row.id);
+  }
+  return null;
+}
+
+// Return the index of the next song, with wraparound.
+function previous_index() {
+  var current_row = document.getElementById(get_row_id_from_index(current_index));
+
+  if (!current_row) {
+    // Display changed since we began playing and the displayed
+    // collection is empty.
+    return null;
+  }
+
+  var collection = document.getElementById('collection_table');
+
+  // If on the first row, go to the last.
+  if (current_row == collection.firstChild.nextSibling) {
+    return get_index_from_row_id(collection.lastChild.id);
+  }
+  var previous_row = current_row.previousSibling;
+  if (previous_row) {
+    return get_index_from_row_id(previous_row.id);
+  }
+  return null;
+}
+
 // Load the song with the given index.
 function select_item(index) {
   // Pause the currently playing song.
@@ -252,7 +343,7 @@ function select_item(index) {
   // Update the UI.
   set_spinner_visible(true);
   if (current_index !== null) {
-    current_row = document.getElementById(get_row_id_from_index(current_index));
+    var current_row = document.getElementById(get_row_id_from_index(current_index));
     if (current_row) {
       current_row.className =
         get_row_class_from_index(get_line_number(current_row));
@@ -261,9 +352,7 @@ function select_item(index) {
   document.getElementById(get_row_id_from_index(index)).className = 'selectedrow';
   // Start streaming the new song.
   var entry = library[index];
-  // Get a buffered stream of the desired file.
-  var bufferParam = using_webkit ? 'buffered=true&' : '';
-  audio = new Audio('/getcontent?' + bufferParam + 'key=' + escape(entry.key));
+  audio = get_stream(entry.key);
   audio.setAttribute('autoplay', 'true');
   current_index = index;
   // Hide the spinner when the song has loaded.
@@ -283,55 +372,19 @@ function select_item(index) {
   set_ui_state('play');
 }
 
-// Check if the song with the given index is the last in the list.
-function is_last_track(index) {
-  var collection = document.getElementById('collection_table');
-  var index_row = document.getElementById(get_row_id_from_index(index));
-  return index_row == collection.lastChild
-}
-
 // Load the next song in the list (with wraparound).
 function select_next() {
-  var collection = document.getElementById('collection_table');
-  var current_row = document.getElementById(get_row_id_from_index(current_index));
-
-  if (!current_row) {
-    // Display changed since we began playing and the displayed
-    // collection is empty.
-    return;
-  }
-
-  // If on the last row, go back to the first.
-  if (current_row == collection.lastChild) {
-    // The table's firstChild is the heading.
-    select_item(get_index_from_row_id(collection.firstChild.nextSibling.id));
-  } else {
-    var next_row = current_row.nextSibling;
-    if (next_row) {
-      select_item(get_index_from_row_id(next_row.id));
-    }
+  next_song_index = next_index();
+  if (next_song_index !== null) {
+    select_item(next_song_index);
   }
 }
 
 // Load the previous song in the list (with wraparound).
 function select_previous() {
-  var collection = document.getElementById('collection_table');
-  var current_row = document.getElementById(get_row_id_from_index(current_index));
-
-  if (!current_row) {
-    // Display changed since we began playing and the displayed
-    // collection is empty.
-    return;
-  }
-
-  // If on the first row, go to the last.
-  if (current_row == collection.firstChild.nextSibling) {
-    select_item(get_index_from_row_id(collection.lastChild.id));
-  } else {
-    var previous_row = current_row.previousSibling;
-    if (previous_row) {
-      select_item(get_index_from_row_id(previous_row.id));
-    }
+  previous_song_index = previous_index();
+  if (previous_song_index !== null) {
+    select_item(previous_song_index);
   }
 }
 
@@ -351,30 +404,6 @@ function previous() {
       select_previous();
     }
   }
-}
-
-// Set the state of the UI.
-function set_ui_state(new_state) {
-  if (new_state == 'grayed') {
-    // All buttons grayed.
-    document.getElementById("previous_img").className = 'grayed';
-    document.getElementById("play_img").className = 'grayed';
-    document.getElementById("pause_img").className = 'grayed';
-    document.getElementById("next_img").className = 'grayed';
-  } else if (new_state == 'play') {
-    // 'Play' depressed
-    document.getElementById("previous_img").className = '';
-    document.getElementById("play_img").className = 'activated';
-    document.getElementById("pause_img").className = '';
-    document.getElementById("next_img").className = '';
-  } else {
-    // 'Pause' depressed
-    document.getElementById("previous_img").className = '';
-    document.getElementById("pause_img").className = 'activated';
-    document.getElementById("play_img").className = '';
-    document.getElementById("previous_img").className = '';
-  }
-  current_state = new_state;
 }
 
 // Stop playback.
@@ -413,6 +442,9 @@ function init() {
   // is applied to the collection when it's first displayed to the user again.
   search_string = window.document.getElementById('search_box').value;
   load_collection();
+  // Focus the scrollable area so that PgUp and PgDn keypresses are interpreted
+  // properly.
+  window.document.getElementById('content').focus();
 }
 
 // Clean up after ourselves when the page is unloaded.
@@ -438,6 +470,7 @@ function keydown_handler(e) {
     if (window.document.activeElement
         == window.document.getElementById('search_box')) {
       window.document.getElementById('search_box').blur();
+      window.document.getElementById('content').focus();
     } else {
       hide_help();
     }

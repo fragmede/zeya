@@ -15,7 +15,7 @@ zeya \- a web music server
 \fBzeya\fR \kx
 .if (\nx>(\n(.l/2)) .nr x (\n(.l/5)
 'in \n(.iu+\nxu
-[-h | --help] [--backend=\fIbackend\fR] [--path=\fIpath\fR] [-b | --bitrate=\fIbitrate\fR] [-p | --port=\fIport\fR]
+[-h | --help] [--backend=\fIbackend\fR] [--path=\fIpath\fR] [-b | --bitrate=\fIbitrate\fR] [-p | --port=\fIport\fR] [--basic_auth_file=\fIfile\fR]
 'in \n(.iu-\nxu
 .ad b
 'hy
@@ -24,9 +24,8 @@ Zeya is a streaming music server that brings your music to any
 computer with a web browser. It reads your music library, lets you
 browse your files, and streams them on demand.
 .PP
-The client runs entirely in the browser using the HTML5 draft
-standard technologies--no Flash needed, no Silverlight, no
-applets, no plugins, no external players.
+The client runs entirely in the browser using the HTML5 draft standard
+technologies (no plugins or external players are needed).
 .SH OPTIONS
 .TP 
 \*(T<\fB\-h\fR\*(T>, \*(T<\fB\-\-help\fR\*(T>
@@ -36,17 +35,17 @@ Display help.
 Specify the backend to use.
 .RS 
 .TP 
-rhythmbox
-Read from current user's Rhythmbox library (default).
-.TP 
 dir
-Read a directory's contents, recursively; see
+Read a directory's contents recursively (default). See
 \*(T<\fB\-\-path\fR\*(T>.
+.TP 
+rhythmbox
+Read from current user's Rhythmbox library.
 .RE
 .TP 
 \*(T<\fB\-\-path\fR\*(T>
 Directory in which to look for music. Use with
-\*(T<\fB\-\-backend\fR\*(T>=dir.
+\*(T<\fB\-\-backend\fR\*(T>=dir. (default: ./)
 .TP 
 \*(T<\fB\-b\fR\*(T>, \*(T<\fB\-\-bitrate\fR\*(T>
 Specify the bitrate for output streams, in kbps. (default:
@@ -54,6 +53,11 @@ Specify the bitrate for output streams, in kbps. (default:
 .TP 
 \*(T<\fB\-p\fR\*(T>, \*(T<\fB\-\-port\fR\*(T>
 Listen for requests on the specified port. (default: 8080)
+.TP 
+\*(T<\fB\-\-basic_auth_file\fR\*(T>
+Require basic HTTP authentication and only allow users named in the
+specified file. The file should be in \fBhtpasswd\fR
+format.
 .SH COPYRIGHT
 Zeya was written by Phil Sung and Samson Yeung and is licensed
 under the terms of the GNU Affero GPL license, version 3 or later.

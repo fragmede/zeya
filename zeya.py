@@ -51,12 +51,7 @@ except (ImportError, AttributeError):
     import simplejson as json
 
 import decoders
-
-DEFAULT_PORT = 8080
-DEFAULT_BITRATE = 64 #kbits/s
-DEFAULT_BACKEND = "rhythmbox"
-
-valid_backends = ['rhythmbox', 'dir']
+import options
 
 b64dict = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 auth = 'Authorization'
@@ -109,10 +104,7 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
     Library data.
     Base directory for resources.
     Bitrate for encoding.
-
-    For the ZeyaBasicAuthHandlerImpl
-    auth_type for 'Basic'
-    auth_data dict holding user/pass-crypt
+    Authentication data.
     """
 
     class ZeyaHandlerImpl(BaseHTTPRequestHandler, object):
@@ -287,93 +279,6 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
         return ZeyaBasicAuthHandlerImpl
     return ZeyaHandlerImpl
 
-def get_options():
-    """
-    Parse the arguments and return a tuple (show_help, backend, bitrate, port,
-    path), or raise BadArgsError if the invocation was not valid.
-
-    show_help: whether user requested help information
-    backend: string indicating backend to use
-    bitrate: bitrate for encoded streams (kbits/sec)
-    port: port number to listen on
-    path: path from which to read music files (for "dir" backend only)
-    basic_auth_file: file handle to read basic auth from
-    """
-    help_msg = False
-    port = DEFAULT_PORT
-    backend_type = DEFAULT_BACKEND
-    bitrate = DEFAULT_BITRATE
-    # This is set to False if --backend is explicitly set
-    is_backend_default_value = True
-    path = None
-    basic_auth_file = None
-    try:
-        opts, file_list = getopt.getopt(sys.argv[1:], "b:hp:",
-                                        ["help", "backend=", "bitrate=",
-                                         "port=", "path=", "basic_auth_file="])
-    except getopt.GetoptError, e:
-        raise BadArgsError(e.msg)
-    for flag, value in opts:
-        if flag in ("-h", "--help"):
-            help_msg = True
-        if flag in ("--backend",):
-            is_backend_default_value = False
-            backend_type = value
-            if backend_type not in valid_backends:
-                raise BadArgsError("Unsupported backend type %r"
-                                   % (backend_type,))
-        if flag in ("-b", "--bitrate"):
-            try:
-                bitrate = int(value)
-                if bitrate <= 0:
-                    raise ValueError()
-            except ValueError:
-                raise BadArgsError("Invalid bitrate setting %r" % (value,))
-        if flag in ("--path",):
-            path = value
-        if flag in ("-p", "--port"):
-            try:
-                port = int(value)
-            except ValueError:
-                raise BadArgsError("Invalid port setting %r" % (value,))
-        if flag in ("--basic_auth_file"):
-            try:
-                basic_auth_file = open(value, 'r')
-            except:
-                raise BadArgsError("Could not read auth file %s" % (value,))
-    if backend_type == 'dir' and path is None:
-        raise BadArgsError("'dir' backend requires a path (--path=...)")
-    # If --backend is not set explicitly, --path=... implies --backend=dir
-    if path is not None and is_backend_default_value:
-        backend_type = 'dir'
-    return (help_msg, backend_type, bitrate, port, path, basic_auth_file)
-
-def usage():
-    print "Usage: %s [OPTIONS]" % (os.path.basename(sys.argv[0]),)
-    print """
-Options:
-
-  -h, --help
-      Display this help message.
-
-  --backend=BACKEND
-      Specify the backend to use. Acceptable values:
-        rhythmbox: (default) read from current user's Rhythmbox library
-        dir: read a directory's contents, recursively; see --path
-
-  --path=PATH
-      Directory in which to look for music. Use with --backend=dir.
-
-  -b, --bitrate=N
-      Specify the bitrate for output streams, in kbits/sec. (default: 64)
-
-  -p, --port=PORT
-      Listen for requests on the specified port. (default: 8080)
-
-  --basic_auth_file=FILENAME
-      Use htpasswd-generated auth file for basic authentication.
-      """
-
 def get_backend(backend_type):
     """
     Return a backend object of the requested type.
@@ -399,6 +304,9 @@ def run_server(backend, port, bitrate, basic_auth_file=None):
     library_contents = \
         [ s for s in library_contents \
               if decoders.has_decoder(backend.get_filename_from_key(s['key'])) ]
+    if not library_contents:
+        print "WARNING: no tracks were found. Check that you've specified " \
+            + "the right backend/path."
     library_repr = json.dumps(library_contents, ensure_ascii=False)
     basedir = os.path.abspath(os.path.dirname(os.path.realpath(sys.argv[0])))
 
@@ -412,15 +320,13 @@ def run_server(backend, port, bitrate, basic_auth_file=None):
         ('', port),
         ZeyaHandler(backend,
                     library_repr,
-                    os.path.join(basedir,
-                                 'resources'),
+                    os.path.join(basedir, 'resources'),
                     bitrate,
                     auth_type=NO_AUTH if basic_auth_file is None else BASIC_AUTH,
                     auth_data=auth_data,
                    ))
     print "Listening on port %d" % (port,)
     # Start up a web server.
-    print "Ready to serve!"
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -430,14 +336,15 @@ def run_server(backend, port, bitrate, basic_auth_file=None):
 
 if __name__ == '__main__':
     try:
-        (show_help, backend_type, bitrate, port, path, basic_auth_file) = get_options()
-    except BadArgsError, e:
+        (show_help, backend_type, bitrate, port, path, basic_auth_file) = \
+            options.get_options(sys.argv[1:])
+    except options.BadArgsError, e:
         print e
-        usage()
+        options.print_usage()
         sys.exit(1)
     if show_help:
-        usage()
+        options.print_usage()
         sys.exit(0)
+    print "Using %r backend." % (backend_type,)
     backend = get_backend(backend_type)
-    print "Using %r backend" % (backend_type,)
     run_server(backend, port, bitrate, basic_auth_file)

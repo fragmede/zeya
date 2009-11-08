@@ -24,7 +24,33 @@
 import unittest
 
 import decoders
+import directory
+import options
 import rhythmbox
+
+class FakeTagpy():
+    """
+    Fake object that can be a stand-in for the tagpy module, but which returns
+    a fixed tag object.
+    """
+    def __init__(self, retval):
+        self.retval = retval
+    def FileRef(self, filename):
+        class FakeTag():
+            # Avoid shadowing the outer instance of 'self', so we can read from
+            # it.
+            def tag(inner_self):
+                return self.retval
+        return FakeTag()
+
+class TagData():
+    """
+    Tag object that holds metadata for a single song.
+    """
+    def __init__(self, artist, title, album):
+        self.artist = artist
+        self.title = title
+        self.album = album
 
 class CommonTest(unittest.TestCase):
     def test_tokenization(self):
@@ -56,6 +82,73 @@ class DecodersTest(unittest.TestCase):
         """
         self.assertTrue(decoders.get_decoder("/path/to/SOMETHING.MP3")[0]
                         .startswith("/usr/bin"))
+
+class DirectoryBackendTest(unittest.TestCase):
+    def test_with_metadata(self):
+        tagpy = FakeTagpy(TagData(artist="Beatles", title="Ticket to Ride",
+                                  album="Help!"))
+        metadata = directory.extract_metadata("/dev/null", tagpy)
+        self.assertEqual("Ticket to Ride", metadata[directory.TITLE])
+        self.assertEqual("Beatles", metadata[directory.ARTIST])
+        self.assertEqual("Help!", metadata[directory.ALBUM])
+    def test_without_metadata(self):
+        tagpy = FakeTagpy(None)
+        metadata = directory.extract_metadata("/the/path/to/Song.flac", tagpy)
+        self.assertEqual("Song.flac", metadata[directory.TITLE])
+        self.assertEqual("", metadata[directory.ARTIST])
+        self.assertEqual("path/to", metadata[directory.ALBUM])
+    def test_short_path(self):
+        tagpy = FakeTagpy(None)
+        metadata = directory.extract_metadata("/music/Song.flac", tagpy)
+        self.assertEqual("music", metadata[directory.ALBUM])
+    def test_noalbum_path(self):
+        tagpy = FakeTagpy(TagData(artist="Beatles", title=None, album=None))
+        metadata = directory.extract_metadata("/music/Song.flac", tagpy)
+        self.assertEqual("", metadata[directory.ALBUM])
+    def test_decode_filename(self):
+        tagpy = FakeTagpy(None)
+        metadata = directory.extract_metadata("/path/to/\xe4\xb8\xad.flac", tagpy)
+        self.assertEqual(u"\u4e2d.flac", metadata[directory.TITLE])
+
+class OptionsTest(unittest.TestCase):
+    def test_default(self):
+        params = options.get_options([])
+        self.assertFalse(params[0])
+        self.assertEqual('dir', params[1])
+        self.assertEqual('.', params[4])
+    def test_get_help(self):
+        params = options.get_options(["--help"])
+        self.assertTrue(params[0])
+    def test_path(self):
+        params = options.get_options(["--path=/foo/bar"])
+        self.assertEqual('/foo/bar', params[4])
+    def test_backend(self):
+        params = options.get_options(["--backend=rhythmbox"])
+        self.assertEqual('rhythmbox', params[1])
+    def test_bad_backend(self):
+        try:
+            params = options.get_options(["--backend=invalid"])
+            self.fail("get_options should have raised BadArgsError")
+        except options.BadArgsError:
+            pass
+    def test_bitrate(self):
+        params = options.get_options(["-b128"])
+        self.assertEqual(128, params[2])
+    def test_bad_bitrate(self):
+        try:
+            params = options.get_options(["--bitrate=0"])
+            self.fail("get_options should have raised BadArgsError")
+        except options.BadArgsError:
+            pass
+    def test_port(self):
+        params = options.get_options(["-p9999"])
+        self.assertEqual(9999, params[3])
+    def test_bad_port(self):
+        try:
+            params = options.get_options(["--port=p"])
+            self.fail("get_options should have raised BadArgsError")
+        except options.BadArgsError:
+            pass
 
 class RhythmboxTest(unittest.TestCase):
     def test_read_library(self):

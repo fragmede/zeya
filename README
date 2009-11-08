@@ -5,17 +5,10 @@ AUTHORS
 
 Copyright (C) 2009 Phil Sung <psung at alum.mit.edu>
 Copyright (C) 2009 Samson Yeung <fragmede at onepatchdown.net>
+Copyright (C) 2009 Romain Francoise <romain at orebokech.com>
 
-Zeya uses public-domain icons from tango-icon-theme, created by:
-  Ulisse Perusin <uli.peru at gmail.com>
-  Steven Garrity <sgarrity at silverorange.com>
-  Lapo Calamandrei <calamandrei at gmail.com>
-  Ryan Collier <rcollier at novell.com>
-  Rodney Dawes <dobey at novell.com>
-  Andreas Nilsson <nisses.mail at home.se>
-  Tuomas Kuosmanen <tigert at tigert.com>
-  Garrett LeSage <garrett at novell.com>
-  Jakub Steiner <jimmac at novell.com>
+Zeya uses public-domain icons from tango-icon-theme.
+  More information: <http://tango.freedesktop.org/>
 
 
 INSTRUCTIONS
@@ -46,13 +39,14 @@ INSTRUCTIONS
 3. Run zeya.py. The --help flag shows the available options. We support two
    backends:
 
-   'rhythmbox' (default): read files from the current user's Rhythmbox library
+   'dir': read all music in a directory and its subdirectories. This is the
+          default.
 
-     $ zeya.py
+     $ zeya.py --path=/path/to/music   # If omitted, --path defaults to ./
 
-   'dir': read files from a directory and its subdirectories (recursively)
+   'rhythmbox': read files from the current user's Rhythmbox library.
 
-     $ zeya.py --path=/path/to/music
+     $ zeya.py --backend=rhythmbox
 
 
 CLIENT SUPPORT
@@ -76,13 +70,7 @@ NOTES ON SUPPORTED CLIENTS
 
 * Chrome
 
-  At the time of writing, official 64-bit builds ("Google Chrome") on GNU/Linux
-  do not play audio (chromium bug #23152). The Chromium builds work just fine.
-  32-bit GNU/Linux and other platforms are unaffected.
-
-  Zeya is known to work in Chrome 4.0.220.1, and likely also for dev channel
-  builds since at least 3.0.198.1, on GNU/Linux and Windows, with the caveat
-  above.
+  Zeya is known to work in Chrome 4.0.223.*, on GNU/Linux, Windows, and Mac OS.
 
   Known issues:
 
