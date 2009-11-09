@@ -41,9 +41,10 @@ def has_decoder(filename):
     """
     try:
         extension = get_extension(filename)
-    except ValueError:
+        return os.path.exists(decoders[extension][0])
+    except (KeyError, ValueError):
         return False
-    return decoders.has_key(extension)
+    return False
 
 def get_decoder(filename):
     """
