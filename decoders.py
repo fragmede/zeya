@@ -17,6 +17,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with Zeya. If not, see <http://www.gnu.org/licenses/>.
 
+import os
 
 # Logic for selecting which decoder to run for a given file.
 
