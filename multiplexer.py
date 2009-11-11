@@ -1,3 +1,10 @@
+#
+
+# see also:
+#    http://www.xiph.org/vorbis/doc/oggstream.html
+#    http://www.xiph.org/vorbis/doc/framing.html
+
+
 import fcntl
 import os
 import signal
@@ -8,15 +15,6 @@ import subprocess
 import thread
 import time
 
-try:
-    subprocess.Popen.terminate
-except AttributeError:
-    def sub_popen_terminate(self):
-        # This will only work on Unix-like systems, but it's better than
-        # nothing.
-        os.kill(self.pid, signal.SIGTERM)
-    subprocess.Popen.terminate = sub_popen_terminate
-
 output_list = []
 header_packets = []
 
@@ -24,16 +22,18 @@ bitrate = 64
 
 HEADER_LEN = 1
 OGG_MAGIC = 'OggS\x00'
-#GRANULE_POS_OFFSET = 6
 GRANULE_POS_LEN = 8
 SERIAL_NUM_LEN = 4
 PAGE_SEQ_LEN = 4
 CHECKSUM_LEN = 4
 PAGE_SEGMENTS_LEN = 1
 
-class OggPacketizer(object):
+#packet_header_map = [   ( 'header_type', HEADER_LEN),
+#                        ( 'granule_pos', GRANULE_POS_LEN),
+
+class OggPacketReader(object):
     def __init__(self, input_stream):
-        self.header = ''
+        self.data = ''
         self.read_ogg_packet(input_stream)
 
     def is_header(self):
@@ -41,7 +41,10 @@ class OggPacketizer(object):
 
     def read_ogg_packet(self, data):
         magic = data.read(len(OGG_MAGIC))
+        if len(magic) == 0:
+            raise EOFError
         assert(magic == OGG_MAGIC)
+        self.data += magic
 
         # TODO - make map creating locals
         self.header_type = data.read(HEADER_LEN)
@@ -49,7 +52,14 @@ class OggPacketizer(object):
         self.serial_num = data.read(SERIAL_NUM_LEN)
         self.page_seq_num = data.read(PAGE_SEQ_LEN)
         self.checksum = data.read(CHECKSUM_LEN)
-        self.page_segments = ord(data.read(PAGE_SEGMENTS_LEN))
+        self.page_segments = data.read(PAGE_SEGMENTS_LEN)
+
+        self.data += self.header_type
+        self.data += self.granule_pos
+        self.data += self.serial_num
+        self.data += self.page_seq_num
+        self.data += self.checksum
+        self.data += self.page_segments
 
         #print 'header_type  ',  repr(self.header_type)
         #print 'granule_pos  ',  repr(self.granule_pos)
@@ -60,22 +70,16 @@ class OggPacketizer(object):
 
         #print '  page_segs', self.page_segments
 
-        #if self.page_segments == 0:
-        #    foo = data.read(1)
-        #    #print 's', ord(foo)
-        #    data.read(ord(foo)+16)
-        #    #print 'endp', hex(f.tell())
-        #    return
-
-        segment_table = data.read(self.page_segments)
-        #segment_table = data.read(0)
+        segment_table = data.read(ord(self.page_segments))
+        self.data += segment_table
         segments = []
-        #print 'st', segment_table
         for segment in segment_table:
             #print 'segment n', hex(ord(segment))
             segments.append(data.read(ord(segment)))
+            self.data += segments[-1]
 
-        #data.read(1)
+    def write_page(self, output):
+        output.write(self.serial_num)
 
 class OggPageSync(object):
     def __init__(self, output):
@@ -133,6 +137,22 @@ def server(num):
     output_list.append(OggPageSync(conn))
 
 if __name__ == "__main__":
+
+    def file_in_paths(name, paths):
+        for path in search_paths:
+            if os.path.exists(os.path.join(path, 'oggdec')):
+                return True
+        return False
+
+#
+    import os
+    MY_PATH = os.getenv('PATH', 'Error')
+    search_paths = [x for x in MY_PATH.split(':') if x]
+    print file_in_paths('oggdec', search_paths)
+
+
+
+
     #test ogg packets at:
     #  0x0
     #  0x3a
@@ -159,12 +179,18 @@ if __name__ == "__main__":
 #        f.seek(offset, 0)
 #        print hex(offset), f.read(6).find('O')
         #print offset, repr(f.read(6))
-    #import sys
-    #sys.exit()
+    import sys
+    sys.exit()
     f = open('test.ogg', 'r')
-    for i in range(8):
-        p = OggPacketizer(f)
+    out = open('2.ogg', 'wb')
+    #for i in range(8):
+    i = 1
+    while True:
+        p = OggPacketReader(f)
         print 'packet', i, 'at', hex(f.tell()), p.is_header()
+        i += 1
+        #p.write_page(out)
+        out.write(p.data)
 
     #thread.start_new_thread(reader, ())
     #thread.start_new_thread(server, (0,))
