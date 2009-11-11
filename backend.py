@@ -63,7 +63,7 @@ def filename_to_stream(filename, out_stream, bitrate, buffered=False):
     except KeyError:
         raise StreamGenerationError(
             "Couldn't play specified format: %r" % (filename,))
-    encode_command = ["/usr/bin/oggenc", "-r", "-Q", "-b", str(bitrate), "-"]
+    encode_command = ["/usr/bin/lame", "-r", "--quiet", "-b", str(bitrate), "-", '-']
     # Pipe the decode command into the encode command.
     p1 = subprocess.Popen(decode_command, stdout=subprocess.PIPE)
     if buffered:

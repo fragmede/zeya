@@ -145,6 +145,8 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
                 return 'text/css'
             elif path.endswith('.js'):
                 return 'text/javascript'
+            elif path.endswith('.mp3'):
+                return 'audio/mp3'
             elif path.endswith('.ogg'):
                 return 'audio/ogg'
             else:
@@ -166,7 +168,7 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
             buffered = args['buffered'][0] if args.has_key('buffered') else ''
 
             self.send_response(200)
-            self.send_header('Content-type', 'audio/ogg')
+            self.send_header('Content-type', 'audio/mp3')
             if buffered:
                 # Complete the transcode and write to a temporary file.
                 # Determine its length and serve the Content-Length header.
