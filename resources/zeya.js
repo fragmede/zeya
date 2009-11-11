@@ -187,7 +187,7 @@ function render_collection() {
 }
 
 // Request the collection from the server then render it.
-function load_collection() {
+function load_collection(load_callback) {
   var req = new XMLHttpRequest();
   req.open('GET', '/getlibrary', true);
   req.onreadystatechange = function(e) {
@@ -195,6 +195,8 @@ function load_collection() {
       library = JSON.parse(req.responseText);
       status_info.total_tracks = library.length;
       render_collection();
+      if (load_callback())
+	load_callback();
     }
   };
   req.send(null);
@@ -418,7 +420,11 @@ function init() {
   // entered value. Load that into search_string here so that the search filter
   // is applied to the collection when it's first displayed to the user again.
   search_string = window.document.getElementById('search_box').value;
-  load_collection();
+  load_collection(function(){
+    if (library.length > 0)
+      select_item(0);
+    pause();
+  });
   // Focus the scrollable area so that PgUp and PgDn keypresses are interpreted
   // properly.
   window.document.getElementById('content').focus();
