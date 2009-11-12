@@ -63,57 +63,8 @@ def filename_to_stream(filename, out_stream, bitrate, buffered=False):
     except KeyError:
         raise StreamGenerationError(
             "Couldn't play specified format: %r" % (filename,))
-    encode_command = ["/usr/bin/oggenc", "-r", "-Q", "-b", str(bitrate), "-"]
     # Pipe the decode command into the encode command.
-    p1 = subprocess.Popen(decode_command, stdout=subprocess.PIPE)
-    if buffered:
-        # Read the entire output and then write it to the output stream.
-        p2 = subprocess.Popen(encode_command, stdin=p1.stdout, stdout=subprocess.PIPE)
-        out_stream.write(p2.stdout.read())
-    else:
-        # Stream the encoder output while limiting the total bandwidth used. We
-        # do this by writing the encoder output to a pipe and reading from the
-        # pipe at a limited rate.
-        (read_fd, write_fd) = os.pipe()
-        p2 = subprocess.Popen(encode_command, stdin=p1.stdout,
-                              stdout=os.fdopen(write_fd, 'wb'))
-        bytes_written = 0
-        start_time = time.time()
-        # Compute the output rate, converting kilobits/sec to bytes/sec.
-        max_bytes_per_sec = RATE_MULTIPLIER * bitrate * 1024 / 8
-        # Don't let reads block when we've read to the end of the encoded song
-        # data.
-        fcntl.fcntl(read_fd, fcntl.F_SETFL, os.O_NONBLOCK)
-        encoder_finished = False
-        while True:
-            time.sleep(1/STREAM_WRITE_FREQUENCY)
-            # If the average transfer rate exceeds the threshold, sleep for a
-            # while longer.
-            if bytes_written >= (time.time() - start_time) * max_bytes_per_sec:
-                continue
-            # Detect when the encoder process has finished. We assume that data
-            # written by the encoder is immediately available via os.read.
-            # Therefore, if the encoder has finished, and we subsequently
-            # cannot read data from the input stream, we can conclude that we
-            # have read all the data.
-            if p2.poll() != None:
-                encoder_finished = True
-            try:
-                data = os.read(read_fd, STREAM_CHUNK_SIZE)
-            except OSError:
-                # OSError will be thrown if we read before the pipe has had any
-                # data written to it.
-                data = ""
-            if encoder_finished and len(data) == 0:
-                break
-            try:
-                out_stream.write(data)
-            except socket.error:
-                # The client likely terminated the connection. Abort.
-                p1.terminate()
-                p2.terminate()
-                return
-            bytes_written = bytes_written + len(data)
+    return subprocess.Popen(decode_command, stdout=open('mux_input_fifo', 'w'))
 
 # This interface is implemented by all library backends.
 
@@ -151,7 +102,7 @@ class LibraryBackend():
         except KeyError:
             print "Received invalid request for key %r" % (key,)
         try:
-            filename_to_stream(filename, out_stream, bitrate, buffered)
+            return filename_to_stream(filename, out_stream, bitrate, buffered)
         except StreamGenerationError, e:
             print "ERROR. %s" % (e,)
 

@@ -167,7 +167,7 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
                 self.wfile.close()
                 return
 
-            pipename = 'output%s' % (key, )
+            pipename = 'mux_output'
 
             s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             s.connect(pipename)
@@ -175,24 +175,6 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
             print 'here', pipename
             while True:
                 self.wfile.write(s.recv(4096))
-
-            import time
-            thing = self
-            output = open(file, 'r')
-            while True:
-                thing.wfile.write(output.read(4096))
-                #thing.wfile.flush(buff)
-            print 'quit'
-            #class Foo(threading.Thread):
-            #    def foo():
-            #        output = open('output', 'r')
-            #        while True:
-            #            time.sleep(.1)
-            #            thing.wfile.write(output.read(4096))
-            #        print 'quit'
-            #f = Foo()
-            #f.start()
-            print 'there'
             return
             #self.wfile.wri
             # The query is of the form key=N or key=N&buffered=true.

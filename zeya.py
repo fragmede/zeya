@@ -53,6 +53,8 @@ except (ImportError, AttributeError):
 import decoders
 import options
 
+decode_proc = None
+
 b64dict = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 auth = 'Authorization'
 no_auth_rval = \
@@ -163,15 +165,37 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
             # we can't serve any of the file until we've finished encoding the
             # whole thing. However, Chrome needs the Content-Length header to
             # accompany audio data.
+
+            global decode_proc
+            if decode_proc is not None:
+                decode_proc.terminate()
+                decode_proc = None
+            if key == '-1':
+
+                self.send_response(200)
+                self.send_header('Content-type', 'audio/ogg')
+                self.end_headers()
+
+                pipename = 'mux_output'
+
+                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                s.connect(pipename)
+
+                print 'here', pipename
+                while True:
+                    self.wfile.write(s.recv(4096))
+                return
+
             buffered = args['buffered'][0] if args.has_key('buffered') else ''
 
             self.send_response(200)
             self.send_header('Content-type', 'audio/ogg')
+            global decode_proc
             if buffered:
                 # Complete the transcode and write to a temporary file.
                 # Determine its length and serve the Content-Length header.
                 output_file = tempfile.TemporaryFile()
-                backend.get_content(key, output_file, bitrate, buffered=True)
+                decode_proc = backend.get_content(key, output_file, bitrate, buffered=True)
                 output_file.seek(0)
                 data = output_file.read()
                 self.send_header('Content-Length', str(len(data)))
@@ -181,7 +205,7 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
                 # Don't determine the Content-Length. Just stream to the client
                 # on the fly.
                 self.end_headers()
-                backend.get_content(key, self.wfile, bitrate)
+                decode_proc = backend.get_content(key, self.wfile, bitrate)
             self.wfile.close()
 
         def send_data(self, ctype, data):

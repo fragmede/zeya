@@ -1,5 +1,10 @@
 #
 
+
+#arch:
+#   fifo with raw bytes -> here
+#   here -> oggenc -> stream out
+
 # see also:
 #    http://www.xiph.org/vorbis/doc/oggstream.html
 #    http://www.xiph.org/vorbis/doc/framing.html
@@ -40,9 +45,17 @@ class OggPacketReader(object):
         return all([x == '\x00' for x in self.granule_pos])
 
     def read_ogg_packet(self, data):
+        # wrap this behavior elsewhere
+        # so OggPacketReader has no concept
         magic = data.read(len(OGG_MAGIC))
-        if len(magic) == 0:
-            raise EOFError
+        #while True:
+        #    magic = data.read(len(OGG_MAGIC))
+        #    if len(magic) == len(OGG_MAGIC):
+        #        break
+        #    elif len(magic) != 0:
+        #        raise Exception('partial read')
+                #print 'partial read! ', len(magic)
+
         assert(magic == OGG_MAGIC)
         self.data += magic
 
@@ -61,15 +74,6 @@ class OggPacketReader(object):
         self.data += self.checksum
         self.data += self.page_segments
 
-        #print 'header_type  ',  repr(self.header_type)
-        #print 'granule_pos  ',  repr(self.granule_pos)
-        #print 'serial_num   ',  repr(self.serial_num)
-        #print 'page_seq_num ',  repr(self.page_seq_num)
-        #print 'checksum     ',  repr(self.checksum)
-        #print 'page_segments',  repr(self.page_segments)
-
-        #print '  page_segs', self.page_segments
-
         segment_table = data.read(ord(self.page_segments))
         self.data += segment_table
         segments = []
@@ -81,44 +85,72 @@ class OggPacketReader(object):
     def write_page(self, output):
         output.write(self.serial_num)
 
-class OggPageSync(object):
-    def __init__(self, output):
-        self.output_sock = output
-        self.syncd = False
+def oggenc():
+    print 'oggenc thread started'
+    #encode_command = ["/usr/bin/oggenc", "-r", "-b", str(bitrate), "-"]
+    input = open('mux_input_fifo', 'rb')
+    output = open('mux_output_fifo', 'wb')
+    encode_command = "/usr/bin/oggenc -r -Q -b 64 - -M 70"
+    p1 = subprocess.Popen(encode_command.split(),
+                          stdin=input,
+                          #stdout=subprocess.PIPE,
+                          stdout=output,
+                          #shell=True,
+                         )
+    #p2 = subprocess.Popen("cstream -t 80k", stdin=p1.stdout,
+    #                      stdout=output, shell=True)
+
+    p1.wait()
+    print 'doom!, oggenc thread ended'
+
+class SockObjRedir:
+    def __init__(self, conn):
+        self.conn = conn
 
     def write(self, data):
-        if self.syncd:
-            self.output_sock.send(data)
-            return
-        page_start = data.find(OGG_MAGIC)
-        if page_start == -1:
-            return
-        self.output_sock.send(data[page_start:])
-        self.syncd = True
+        self.conn.send(data)
+
+    def read(self, data_len=0):
+        return self.conn.recv(data_len)
+
+def err_catch(input):
+    try:
+        return True, OggPacketReader(input)
+    finally:
+        return False, None
 
 def reader():
     global output_list
     print 'reader thread started'
-    input_fifo = 'ogg_fifo'
+    input_fifo = 'mux_output_fifo'
     global header_packets
     f = open(input_fifo, 'r')
     while True:
-        time.sleep(.2)
         while len(output_list) == 0:
             time.sleep(.2)
-        packet = ogg_packet(f)
+        #while True:
+        #    cont, packet = err_catch(f)
+        #    if cont:
+        #        break
+        try:
+            packet = OggPacketReader(f)
+        except:
+            continue
         if packet.is_header():
             header_packets.append(packet)
         #buff = f.read(4096)
         for output in output_list:
-            output.write(buff)
+            try:
+                output.write(packet.data)
+            except:
+                output_list.remove(output)
 
 def server(num):
     global output_list
     global header_packets
     print 'server thread', num, 'started'
 
-    pipename = 'output%s' % (num, )
+    pipename = 'mux_output'
     try:
         os.remove(pipename)
     except:
@@ -129,73 +161,23 @@ def server(num):
     s.bind(pipename)
     s.listen(1)
 
-    conn, addr = s.accept()
-    print 'client connected', conn, addr
-    for packet in header_packets:
-        conn.send(packet)
+    while True:
+        conn, addr = s.accept()
+        connIO = SockObjRedir(conn)
+        print 'client connected', addr
+        for packet in header_packets:
+            connIO.write(packet.data)
 
-    output_list.append(OggPageSync(conn))
+        output_list.append(connIO)
 
 if __name__ == "__main__":
-
-    def file_in_paths(name, paths):
-        for path in search_paths:
-            if os.path.exists(os.path.join(path, 'oggdec')):
-                return True
-        return False
-
-#
-    import os
-    MY_PATH = os.getenv('PATH', 'Error')
-    search_paths = [x for x in MY_PATH.split(':') if x]
-    print file_in_paths('oggdec', search_paths)
-
-
-
-
-    #test ogg packets at:
-    #  0x0
-    #  0x3a
-    #  0xf8b
-    #  0x1fc9
-    #  0x30d1
-    #  0x4111
-
-#    f = open('test.ogg', 'r')
-#    d = f.read(0x5000)
-#    offset = -1
-#    pack_begins = []
-#    while True:
-#        idx = d.find('OggS')
-#        if idx == -1:
-#            break
-#        d = d[idx+1:]
-#        offset += idx + 1
-#        print hex(offset)
-#        pack_begins.append(offset)
-#
-#    print 'packs'
-#    for offset in pack_begins:
-#        f.seek(offset, 0)
-#        print hex(offset), f.read(6).find('O')
-        #print offset, repr(f.read(6))
-    import sys
-    sys.exit()
-    f = open('test.ogg', 'r')
-    out = open('2.ogg', 'wb')
-    #for i in range(8):
-    i = 1
-    while True:
-        p = OggPacketReader(f)
-        print 'packet', i, 'at', hex(f.tell()), p.is_header()
-        i += 1
-        #p.write_page(out)
-        out.write(p.data)
-
     #thread.start_new_thread(reader, ())
-    #thread.start_new_thread(server, (0,))
-    #thread.start_new_thread(server, (1,))
+    def loop(call):
+        while True:
+            call()
+    thread.start_new_thread(lambda :loop(lambda :server(0)), ())
+    thread.start_new_thread(lambda :loop(oggenc), ())
 
-    #reader()
+    reader()
     #while True:
     #    time.sleep(.2)
