@@ -329,6 +329,8 @@ def run_server(backend, port, bitrate, basic_auth_file=None):
                     auth_data=auth_data,
                    ))
     print "Listening on port %d" % (port,)
+    # Try opening zeya locally in a web browser
+    os.system("gnome-open http://localhost:%d"%port)
     # Start up a web server.
     try:
         server.serve_forever()
