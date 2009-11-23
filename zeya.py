@@ -73,6 +73,9 @@ no_auth_rval = \
 NO_AUTH = None
 BASIC_AUTH = 'basic'
 
+from radio import RadioStation
+global radio_station
+
 class BadArgsError(Exception):
     """
     Error due to incorrect command-line invocation of this program.
@@ -170,42 +173,35 @@ def ZeyaHandler(backend, library_repr, resource_basedir, bitrate,
             if decode_proc is not None:
                 decode_proc.terminate()
                 decode_proc = None
+            global radio_station
             if key == '-1':
 
                 self.send_response(200)
                 self.send_header('Content-type', 'audio/ogg')
                 self.end_headers()
 
-                pipename = 'mux_output'
-
-                s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                s.connect(pipename)
-
-                print 'here', pipename
-                while True:
-                    self.wfile.write(s.recv(4096))
+                radio_station.add_listener(self.wfile)
+                import time
+                while True: #change to while self.wfile is a listener
+                    time.sleep(3)
                 return
 
             buffered = args['buffered'][0] if args.has_key('buffered') else ''
 
             self.send_response(200)
-            self.send_header('Content-type', 'audio/ogg')
+            self.send_header('Content-type', 'text/txt')
             global decode_proc
-            if buffered:
-                # Complete the transcode and write to a temporary file.
-                # Determine its length and serve the Content-Length header.
-                output_file = tempfile.TemporaryFile()
-                decode_proc = backend.get_content(key, output_file, bitrate, buffered=True)
-                output_file.seek(0)
-                data = output_file.read()
-                self.send_header('Content-Length', str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
-            else:
-                # Don't determine the Content-Length. Just stream to the client
-                # on the fly.
-                self.end_headers()
-                decode_proc = backend.get_content(key, self.wfile, bitrate)
+
+            # Don't determine the Content-Length. Just stream to the client
+            # on the fly.
+            self.end_headers()
+            #decode_proc = backend.get_content(key, self.wfile, bitrate)
+
+            #radio_station.input = decode_proc.stdout
+            radio_station.input = backend.get_content(key, self.wfile,
+                                                      bitrate).stdout
+
+            self.wfile.write('okay')
             self.wfile.close()
 
         def send_data(self, ctype, data):
@@ -334,6 +330,11 @@ def run_server(backend, port, bitrate, basic_auth_file=None):
     library_repr = json.dumps(library_contents, ensure_ascii=False)
     basedir = os.path.abspath(os.path.dirname(os.path.realpath(sys.argv[0])))
 
+
+    global radio_station
+    radio_station = RadioStation()
+
+
     auth_data = None
     if basic_auth_file is not None:
         auth_data = {}
@@ -372,3 +373,4 @@ if __name__ == '__main__':
     print "Using %r backend." % (backend_type,)
     backend = get_backend(backend_type)
     run_server(backend, port, bitrate, basic_auth_file)
+

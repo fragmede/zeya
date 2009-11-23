@@ -19,7 +19,6 @@ import time
 # Zeya Imports
 from BlockingList import BlockingList
 from OggReader import OggPacketReader
-#import thread
 
 """
 How many threads are needed?
@@ -49,19 +48,30 @@ class GlobalRadioHandler(object):
 IN_BUF_SIZE = 44100 * 16 * 2 / 8
 
 def oggenc():
-    encode_command = "/usr/bin/oggenc --quiet --raw -b 64 --managed -m 60 -m 70 --raw-bits 16 --raw-chan 2 --raw-rate 44100 -"
+    encode_command = "/usr/bin/oggenc --quiet --raw -b 64 --raw-bits 16 --raw-chan 2 --raw-rate 44100 -"
 
-    return subprocess.Popen(encode_command.split(),
+    rval = subprocess.Popen(encode_command.split(),
                             stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE,
                            )
+    attrb = fcntl.fcntl(rval.stdout.fileno() , fcntl.F_GETFL, os.O_NONBLOCK)
+    fcntl.fcntl(rval.stdout.fileno() , fcntl.F_SETFL, attrb & (~os.O_NONBLOCK))
+
+    attrb = fcntl.fcntl(rval.stdin.fileno() , fcntl.F_GETFL, os.O_NONBLOCK)
+    fcntl.fcntl(rval.stdin.fileno() , fcntl.F_SETFL, attrb & (~os.O_NONBLOCK))
+    #fcntl.fcntl(rval.stdin.fileno() , fcntl.F_SETFL, os.O_NONBLOCK)
+    return rval
 
 class ProcessIO(object):
     def __init__(self, process):
         self.process = process
+        #fcntl.fcntl(self.process.stdout.fileno() , fcntl.F_SETFL, os.O_NONBLOCK)
 
     def write(self, data):
-        self.process.stdin.write(data)
+        try:
+            self.process.stdin.write(data)
+        except:
+            print 'except writing in ProcessIO'
 
     def read(self, data_len):
         return self.process.stdout.read(data_len)
@@ -100,53 +110,84 @@ class RadioStation(object):
         """
         while self.threads_should_run:
             self.input_work_unit()
-            time.sleep(1) # TODO - efficiency?
+            time.sleep(.8) # TODO - efficiency?
 
     def input_work_unit(self):
-        #if self.input is None:
-        #    in_buf = '\x00' * IN_BUF_SIZE
-        #else:
-        #    in_buf = self.input.read(IN_BUF_SIZE)
-        if self.input is None:
-            return
-        in_buf = self.input.read(IN_BUF_SIZE)
-        print 'in unit', len(in_buf)
+        if self.input is not None:
+            in_buf = self.input.read(IN_BUF_SIZE)
+        else:
+            in_buf = '\x00' * IN_BUF_SIZE
         self.output.write(in_buf)
 
     def output_proc(self):
         """ free wheeling as long as there is output """
-        while True: #self.threads_should_run:
+        while self.threads_should_run:
             self.listeners.acquire()
             while len(self.listeners):
                 self.output_work_unit()
             self.listeners.release()
 
-        for listener in self.listeners:
-            listener.close()
-
-
     def output_work_unit(self):
-        packet = OggPacketReader(self.output)
+        try:
+            packet = OggPacketReader(self.output)
+        except:
+            print 'error reading packet'
+            import traceback
+            traceback.print_exc()
+            import sys
+            sys.exit(1)
+            return
         if packet.is_header():
             self.headers.append(packet)
         for listener in self.listeners:
-            listener.write(packet.data)
-            listener.flush()
+            try:
+                listener.write(packet.data)
+            except:
+                pass
+                #print 'removing dead listener'
+                #self.listeners.remove(listener)
 
     def add_listener(self, listener):
+        print 'adding listener', listener
         for packet in self.headers:
-            listener.write(packet)
+            listener.write(packet.data)
         self.listeners.append(listener)
 
 def main():
     r = RadioStation()
-    r.input = open('2.raw', 'rb')
-    out = open('output.ogg', 'wb')
-    r.add_listener(out)
-    time.sleep(4)
-    r.stop_threads()
-    time.sleep(1)
-    out.close()
+
+    decode_command = "/usr/bin/oggdec -Q -o - 2.ogg"
+
+    rval = subprocess.Popen(decode_command, stdout=subprocess.PIPE, shell=True)
+
+    attr = fcntl.fcntl(rval.stdout.fileno() , fcntl.F_GETFL)
+    fcntl.fcntl(rval.stdout.fileno() , fcntl.F_SETFL, attr & (~os.O_NONBLOCK))
+
+    #fcntl.fcntl(rval.stdout.fileno() , fcntl.F_SETFL, os.O_NONBLOCK)
+
+    r.input = rval.stdout
+    #r.input = open('2.raw', 'rb')
+
+    listen_proc = subprocess.Popen("ogg123 --quiet -", stdin=subprocess.PIPE, shell=True)
+
+    attr = fcntl.fcntl(listen_proc.stdin.fileno() , fcntl.F_GETFL)
+    fcntl.fcntl(listen_proc.stdin.fileno() , fcntl.F_SETFL, attr & (~os.O_NONBLOCK))
+
+    r.add_listener(listen_proc.stdin)
+    time.sleep(400)
+
+
+    #out = open('output.ogg', 'wb')
+    #out2 = open('output2.ogg', 'wb')
+    #r.add_listener(out)
+    #time.sleep(6)
+    #print 'adding out2'
+    #r.add_listener(out2)
+    #time.sleep(1)
+    #r.stop_threads()
+    #time.sleep(1)
+    #out.close()
+    #out2.close()
 
 
 if __name__ == "__main__":

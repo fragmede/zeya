@@ -64,7 +64,10 @@ def filename_to_stream(filename, out_stream, bitrate, buffered=False):
         raise StreamGenerationError(
             "Couldn't play specified format: %r" % (filename,))
     # Pipe the decode command into the encode command.
-    return subprocess.Popen(decode_command, stdout=open('mux_input_fifo', 'w'))
+    rval = subprocess.Popen(decode_command, stdout=subprocess.PIPE)
+    attr = fcntl.fcntl(rval.stdout.fileno() , fcntl.F_GETFL)
+    fcntl.fcntl(rval.stdout.fileno() , fcntl.F_SETFL, attr & (~os.O_NONBLOCK))
+    return rval
 
 # This interface is implemented by all library backends.
 
