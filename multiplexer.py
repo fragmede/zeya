@@ -25,14 +25,6 @@ header_packets = []
 
 bitrate = 64
 
-HEADER_LEN = 1
-OGG_MAGIC = 'OggS\x00'
-GRANULE_POS_LEN = 8
-SERIAL_NUM_LEN = 4
-PAGE_SEQ_LEN = 4
-CHECKSUM_LEN = 4
-PAGE_SEGMENTS_LEN = 1
-
 #packet_header_map = [   ( 'header_type', HEADER_LEN),
 #                        ( 'granule_pos', GRANULE_POS_LEN),
 
