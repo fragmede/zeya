@@ -86,12 +86,12 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     HTTP Server that handles requests in separate threads.
     """
     # Allow IPv6 connections if possible.
-    if socket.has_ipv6:
-        address_family = socket.AF_INET6
+    #if socket.has_ipv6:
+    #    address_family = socket.AF_INET6
 
     def server_bind(self):
-        if socket.has_ipv6:
-            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+        #if socket.has_ipv6:
+        #    self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
         HTTPServer.server_bind(self)
 
 user_pass_regexp = re.compile('([^:]):(.*)$')
